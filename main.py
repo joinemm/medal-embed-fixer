@@ -11,7 +11,6 @@ load_dotenv()
 class MyClient(discord.Client):
     async def on_ready(self):
         print(f"Logged in as {self.user} (ID: {self.user.id})")
-        print("------")
 
     async def on_message(self, message: discord.Message):
         # we do not want the bot to reply to itself
@@ -21,9 +20,7 @@ class MyClient(discord.Client):
         regex = r"https://medal\.tv/games/([^\s?]*)"
         matches = re.finditer(regex, message.content)
         for match in matches:
-            print(match)
             clip_path = match.group(1)
-            print(clip_path)
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f"https://medal.tv/_next/data/ELKh_LJ4D0_htfA9kVKKA/en/games/{clip_path}.json"
