@@ -12,39 +12,44 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-async def get_medal_clip(clip_path: str) -> dict:
+async def get_medal_clip(clip_path: str) -> dict | None:
     original_url = f"https://medal.tv/games/{clip_path}"
     async with aiohttp.ClientSession() as session:
         # get page source to extract __NEXT_DATA__
         async with session.get(original_url) as response:
             source = await response.text()
-            next_data = json.loads(
-                BeautifulSoup(source, "lxml").find("script", {"id": "__NEXT_DATA__"}).text
+            next_data_script = BeautifulSoup(source, "lxml").find(
+                "script", {"id": "__NEXT_DATA__"}
             )
+            if next_data_script is None:
+                return None
+
+        next_data = json.loads(next_data_script.text)
 
         # get the build id from next_data
-        build_id = next_data["buildId"]
+        build_id: str = next_data["buildId"]
 
         # get clip data from newest build
-        async with session.get(
-            f"https://medal.tv/_next/data/{build_id}/en/games/{clip_path}.json"
-        ) as response:
+        api_path = f"https://medal.tv/_next/data/{build_id}/en/games/{clip_path}.json"
+        async with session.get(api_path) as response:
             return await response.json()
 
 
 class MyClient(discord.Client):
     async def on_ready(self):
-        print(f"Logged in as {self.user} (ID: {self.user.id})")
+        print(f"Logged in as {self.user}")
 
     async def on_message(self, message: discord.Message):
         # we do not want the bot to reply to itself
-        if message.author.id == self.user.id:
+        if message.author == self.user:
             return
 
         regex = r"https://medal\.tv/games/([^\s?]*)"
         matches = re.finditer(regex, message.content)
         for match in matches:
             data = await get_medal_clip(match.group(1))
+            if data is None:
+                return print(f"Could not find next data from {match.group(1)}")
 
             content_url = data["pageProps"]["clip"]["contentUrl"]
             content_title = data["pageProps"]["clip"]["contentTitle"]
@@ -62,11 +67,19 @@ class MyClient(discord.Client):
                 print("Tried to suppress message but no permissions :(")
 
 
-if sys.argv[0] == "test":
-    asyncio.run(get_medal_clip("valorant/clips/DC4NEq0hN_KNe/d1337QdxUXRo"))
+if len(sys.argv) > 1 and sys.argv[1] == "get":
+    try:
+        clip = sys.argv[2]
+        asyncio.run(get_medal_clip(clip))
+    except IndexError:
+        print(
+            "Usage:\n"
+            "   Run bot:    python main.py\n"
+            "   Get clip:   python main.py get https://medal.tv/..."
+        )
 else:
     intents = discord.Intents.default()
     intents.message_content = True
 
     client = MyClient(intents=intents)
-    client.run(os.environ.get("TOKEN"))
+    client.run(os.environ["DISCORD_TOKEN"])
