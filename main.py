@@ -8,8 +8,6 @@ import aiohttp
 import discord
 from dotenv import load_dotenv
 
-load_dotenv()
-
 
 @dataclass
 class MedalClip:
@@ -73,4 +71,5 @@ def main():
 
 
 if __name__ == "__main__":
+    load_dotenv()
     main()
